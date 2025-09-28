@@ -17,6 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salama.penny.ui.theme.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -146,19 +149,177 @@ fun ExpenseCard(title: String, amount: String) {
     }
 }
 
+// ------------------ Savings screen + dialog + card ------------------
+
 @Composable
 fun SavingsScreen() {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier.fillMaxWidth().background(DarkPink).padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) { Text("Savings", style = MaterialTheme.typography.titleLarge, color = WhiteText) }
+    var showDialog by remember { mutableStateOf(false) }
+    // list of Triple<goalName, saved, target>
+    var goals by remember { mutableStateOf(listOf<Triple<String, Int, Int>>()) }
 
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Header
         Box(
-            modifier = Modifier.fillMaxSize().background(BabyPink).padding(16.dp)
-        ) { Text("Manage your savings goals 🏦", color = BlackText) }
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(DarkPink)
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Savings", style = MaterialTheme.typography.titleLarge, color = WhiteText)
+        }
+
+        // Body
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BabyPink)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Grow your savings goals 🏦",
+                style = MaterialTheme.typography.bodyLarge,
+                color = BlackText,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Show all goals (if none, show placeholder)
+            if (goals.isEmpty()) {
+                Text("No goals yet — tap + to add one!", color = BlackText)
+            } else {
+                goals.forEach { (goalName, saved, target) ->
+                    SavingsCard(goalName = goalName, saved = saved, target = target)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Add goal button (alternate way to open dialog)
+            Button(
+                onClick = { showDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = DarkPink)
+            ) {
+                Text("Add New Goal", color = WhiteText)
+            }
+        }
+    }
+
+    // Dialog: explicitly typed onSave so Kotlin can infer lambda parameter types
+    if (showDialog) {
+        AddGoalDialog(
+            onDismiss = { showDialog = false },
+            onSave = { name: String, saved: Int, target: Int ->
+                goals = goals + Triple(name, saved, target)
+                showDialog = false
+            }
+        )
     }
 }
+
+@Composable
+fun AddGoalDialog(onDismiss: () -> Unit, onSave: (String, Int, Int) -> Unit) {
+    var goalName by remember { mutableStateOf("") }
+    var savedText by remember { mutableStateOf("") }
+    var targetText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        confirmButton = {
+            TextButton(onClick = {
+                // validate and convert
+                val savedVal = savedText.toIntOrNull() ?: 0
+                val targetVal = targetText.toIntOrNull() ?: 0
+                if (goalName.isNotBlank() && targetVal > 0) {
+                    onSave(goalName.trim(), savedVal, targetVal)
+                    // reset (optional)
+                    goalName = ""
+                    savedText = ""
+                    targetText = ""
+                }
+            }) {
+                Text("Save", color = WhiteText)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onDismiss() }) {
+                Text("Cancel", color = DarkPink)
+            }
+        },
+        title = { Text("Add Savings Goal", color = DarkPink) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = goalName,
+                    onValueChange = { goalName = it },
+                    label = { Text("Goal Name") },
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = savedText,
+                    onValueChange = { savedText = it },
+                    label = { Text("Amount Saved (optional)") },
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = targetText,
+                    onValueChange = { targetText = it },
+                    label = { Text("Target Amount") },
+                    singleLine = true
+                )
+            }
+        },
+        containerColor = BabyPink
+    )
+}
+
+@Composable
+fun SavingsCard(goalName: String, saved: Int, target: Int) {
+    val progress = if (target > 0) saved.coerceAtLeast(0).toFloat() / target.toFloat() else 0f
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = goalName,
+                style = MaterialTheme.typography.titleMedium,
+                color = DarkPink
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // <--- Use lambda-style progress param to avoid deprecation
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp)),
+                color = DarkPink,
+                trackColor = BabyPink
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Saved: Ksh $saved / $target",
+                style = MaterialTheme.typography.bodyMedium,
+                color = BlackText
+            )
+        }
+    }
+}
+
+
+
 
 @Composable
 fun ReportsScreen() {
